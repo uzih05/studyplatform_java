@@ -1,5 +1,7 @@
 package org.study.platform.socket;
 
+import org.springframework.context.ApplicationContext;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -9,10 +11,12 @@ public class SocketServer {
     private ServerSocket serverSocket;
     private static final int PORT = 9090;
     private ConnectionManager connectionManager;
+    private ApplicationContext context;
     private volatile boolean running = false;
 
-    public SocketServer() {
+    public SocketServer(ApplicationContext context) {
         this.connectionManager = new ConnectionManager();
+        this.context = context;
     }
 
     // 서버 시작
@@ -23,7 +27,9 @@ public class SocketServer {
             System.out.println("소켓 서버가 포트 " + PORT + "에서 시작되었습니다.");
 
             // 클라이언트 연결 대기 스레드
-            new Thread(this::acceptClients).start();
+            Thread serverThread = new Thread(this::acceptClients);
+            serverThread.setDaemon(true);
+            serverThread.start();
 
         } catch (IOException e) {
             System.err.println("서버 시작 실패: " + e.getMessage());
@@ -37,9 +43,11 @@ public class SocketServer {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("새로운 클라이언트 연결: " + clientSocket.getInetAddress());
 
-                // 클라이언트 핸들러 생성 및 시작
-                ClientHandler handler = new ClientHandler(clientSocket, connectionManager);
-                new Thread(handler).start();
+                // 클라이언트 핸들러 생성 및 시작 (ApplicationContext 전달)
+                ClientHandler handler = new ClientHandler(clientSocket, connectionManager, context);
+                Thread handlerThread = new Thread(handler);
+                handlerThread.setDaemon(true);
+                handlerThread.start();
 
             } catch (IOException e) {
                 if (running) {

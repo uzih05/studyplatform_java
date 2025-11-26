@@ -16,6 +16,8 @@ public class SocketClient {
     private Long userId;
     private String nickname;
     private volatile boolean running = false;
+    private String lastResponse = null;
+    private final Object responseLock = new Object();
 
     private List<MessageListener> listeners = new ArrayList<>();
 
@@ -36,30 +38,54 @@ public class SocketClient {
             this.userId = userId;
             this.nickname = nickname;
 
+            // AUTH 메시지 전송
             out.println("AUTH:" + userId + ":" + nickname);
+            out.flush();  // 추가
 
+            // 서버 응답 대기 (타임아웃 추가)
+            socket.setSoTimeout(3000);  // 3초 타임아웃
             String response = in.readLine();
+            socket.setSoTimeout(0);  // 타임아웃 해제
+
             if (response != null && response.equals("CONNECTED:success")) {
                 running = true;
 
-                new Thread(this::receiveMessages).start();
+                // 메시지 수신 스레드 시작
+                Thread receiverThread = new Thread(this::receiveMessages);
+                receiverThread.setDaemon(true);
+                receiverThread.start();
 
                 System.out.println("서버 연결 성공: " + nickname + " (" + serverHost + ")");
                 return true;
+            } else {
+                System.err.println("서버 응답 실패: " + response);
             }
 
         } catch (IOException e) {
             System.err.println("서버 연결 실패 (" + serverHost + "): " + e.getMessage());
+            e.printStackTrace();
         }
         return false;
     }
 
+    // receiveMessages 메서드
     private void receiveMessages() {
         try {
             String message;
             while (running && (message = in.readLine()) != null) {
+                final String finalMessage = message;
+
+                // 응답 메시지인 경우 (|로 구분된 메시지)
+                if (message.contains("|") && message.contains("_RESPONSE")) {
+                    synchronized (responseLock) {
+                        lastResponse = message;
+                        responseLock.notify();
+                    }
+                }
+
+                // 리스너들에게 메시지 전달
                 for (MessageListener listener : listeners) {
-                    listener.onMessageReceived(message);
+                    listener.onMessageReceived(finalMessage);
                 }
             }
         } catch (IOException e) {
@@ -113,5 +139,80 @@ public class SocketClient {
 
     public boolean isConnected() {
         return running && socket != null && !socket.isClosed();
+    }
+
+    // 동기 요청/응답 메서드 (기존 receiveMessages 메서드 아래에 추가)
+    public String sendRequestAndWaitResponse(String request, String expectedResponsePrefix) {
+        synchronized (responseLock) {
+            lastResponse = null;
+            sendMessage(request);
+
+            try {
+                // 응답 대기 (최대 5초)
+                responseLock.wait(5000);
+
+                if (lastResponse != null && lastResponse.startsWith(expectedResponsePrefix)) {
+                    return lastResponse;
+                }
+
+                return null;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
+            }
+        }
+    }
+
+    // 편의 메서드들 추가
+    public String login(String username, String password) {
+        return sendRequestAndWaitResponse("LOGIN|" + username + "|" + password, "LOGIN_RESPONSE");
+    }
+
+    public String register(String username, String password, String nickname) {
+        return sendRequestAndWaitResponse("REGISTER|" + username + "|" + password + "|" + nickname, "REGISTER_RESPONSE");
+    }
+
+    public String getRooms() {
+        return sendRequestAndWaitResponse("GET_ROOMS", "GET_ROOMS_RESPONSE");
+    }
+
+    public String createRoom(String roomName) {
+        return sendRequestAndWaitResponse("CREATE_ROOM|" + roomName, "CREATE_ROOM_RESPONSE");
+    }
+
+    public String deleteRoom(Long roomId) {
+        return sendRequestAndWaitResponse("DELETE_ROOM|" + roomId, "DELETE_ROOM_RESPONSE");
+    }
+
+    public String getPosts(Long roomId) {
+        return sendRequestAndWaitResponse("GET_POSTS|" + roomId, "GET_POSTS_RESPONSE");
+    }
+
+    public String createPost(Long roomId, String title, String content, String postType) {
+        return sendRequestAndWaitResponse("CREATE_POST|" + roomId + "|" + title + "|" + content + "|" + postType, "CREATE_POST_RESPONSE");
+    }
+
+    public String deletePost(Long postId) {
+        return sendRequestAndWaitResponse("DELETE_POST|" + postId, "DELETE_POST_RESPONSE");
+    }
+
+    public String getComments(Long postId) {
+        return sendRequestAndWaitResponse("GET_COMMENTS|" + postId, "GET_COMMENTS_RESPONSE");
+    }
+
+    public String createComment(Long postId, String content) {
+        return sendRequestAndWaitResponse("CREATE_COMMENT|" + postId + "|" + content, "CREATE_COMMENT_RESPONSE");
+    }
+
+    public String getUser(Long userId) {
+        return sendRequestAndWaitResponse("GET_USER|" + userId, "GET_USER_RESPONSE");
+    }
+
+    public String markRead(Long postId) {
+        return sendRequestAndWaitResponse("MARK_READ|" + postId, "MARK_READ_RESPONSE");
+    }
+
+    public String getReadStatus(Long postId) {
+        return sendRequestAndWaitResponse("GET_READ_STATUS|" + postId, "GET_READ_STATUS_RESPONSE");
     }
 }
