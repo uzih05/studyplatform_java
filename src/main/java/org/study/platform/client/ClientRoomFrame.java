@@ -200,10 +200,10 @@ public class ClientRoomFrame extends JFrame {
                     if (postData.length >= 5) {
                         Object[] row = {
                                 Long.parseLong(postData[0]),  // postId
-                                postData[1].replace("｜", "|").replace("：", ":"),  // title
-                                postData[2],                   // authorName
-                                postData[3].equals("NOTICE") ? "공지" : "일반",  // postType
-                                postData[4]                    // createdAt
+                                decode(postData[1]),
+                                postData[2],
+                                postData[3].equals("NOTICE") ? "공지" : "일반",
+                                postData[4]                   // createdAt
                         };
                         tableModel.addRow(row);
                     }
@@ -239,7 +239,7 @@ public class ClientRoomFrame extends JFrame {
                         String[] commentData = parts[i].split(":");
                         if (commentData.length >= 4) {
                             commentArea.append("[" + commentData[1] + "] " + commentData[3] + "\n");
-                            commentArea.append(commentData[2].replace("｜", "|").replace("：", ":") + "\n\n");
+                            commentArea.append(decode(commentData[2]) + "\n\n");
                         }
                     }
                 }
@@ -415,4 +415,12 @@ public class ClientRoomFrame extends JFrame {
                     "오류", JOptionPane.ERROR_MESSAGE);
         }
     }
+
+    private String decode(String text) {
+        if (text == null) return "";
+        return text.replace("&#124;", "|")
+                .replace("&#58;", ":")
+                .replace("&#10;", "\n");
+    }
+
 }

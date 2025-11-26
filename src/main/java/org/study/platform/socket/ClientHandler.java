@@ -39,6 +39,20 @@ public class ClientHandler implements Runnable {
         this.postReadStatusService = context.getBean(PostReadStatusService.class);
     }
 
+    private String encode(String text) {
+        if (text == null) return "";
+        return text.replace("|", "&#124;")   // 파이프 변환
+                .replace(":", "&#58;")    // 콜론 변환
+                .replace("\n", "&#10;");  // 줄바꿈 변환
+    }
+
+    private String decode(String text) {
+        if (text == null) return "";
+        return text.replace("&#124;", "|")
+                .replace("&#58;", ":")
+                .replace("&#10;", "\n");
+    }
+
     @Override
     public void run() {
         try {
@@ -256,7 +270,8 @@ public class ClientHandler implements Runnable {
 
                 sb.append("|")
                         .append(post.getPostId()).append(":")
-                        .append(post.getTitle().replace("|", "｜").replace(":", "：")).append(":")
+                        .append(encode(post.getTitle())).append(":")
+
                         .append(authorName).append(":")
                         .append(post.getPostType()).append(":")
                         .append(post.getCreatedAt());
@@ -276,8 +291,8 @@ public class ClientHandler implements Runnable {
         }
 
         Long roomId = Long.parseLong(parts[1]);
-        String title = parts[2];
-        String content = parts[3];
+        String title = decode(parts[2]);
+        String content = decode(parts[3]);
         Post.PostType postType = Post.PostType.valueOf(parts[4]);
 
         try {
@@ -325,7 +340,8 @@ public class ClientHandler implements Runnable {
                 sb.append("|")
                         .append(comment.getCommentId()).append(":")
                         .append(authorName).append(":")
-                        .append(comment.getContent().replace("|", "｜").replace(":", "：")).append(":")
+
+                        .append(encode(comment.getContent())).append(":")
                         .append(comment.getCreatedAt());
             }
 
@@ -343,7 +359,7 @@ public class ClientHandler implements Runnable {
         }
 
         Long postId = Long.parseLong(parts[1]);
-        String content = parts[2];
+        String content = decode(parts[2]);
 
         try {
             Comment comment = commentService.createComment(postId, userId, content);
@@ -421,7 +437,7 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    // CHAT 처리 (기존)
+    // CHAT 처리
     private void handleChat(String[] parts) {
         if (parts.length >= 2) {
             String chatMessage = parts[1];
@@ -446,10 +462,22 @@ public class ClientHandler implements Runnable {
 
     // 연결 종료
     public void disconnect() {
+        if (!running) return;
         running = false;
-        if (userId != null) {
-            connectionManager.removeClient(userId);
-            connectionManager.broadcastUserList();
+        try {
+            if (userId != null) {
+                connectionManager.removeClient(userId);
+                // 서버 전체 종료 시에는 아래 broadcast가 병목이 됨.
+                // 하지만 개별 클라이언트가 나갈 때는 필요함.
+                // 일단 유지하되, 예외 발생 시 무시하도록 try-catch로 감쌉니다.
+                try {
+                    connectionManager.broadcastUserList();
+                } catch (Exception e) {
+                    // 브로드캐스트 실패는 무시 (서버 종료 상황 등)
+                }
+            }
+        } catch (Exception e) {
+            // 무시
         }
 
         try {

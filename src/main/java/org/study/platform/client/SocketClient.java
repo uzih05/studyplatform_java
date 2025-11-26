@@ -29,6 +29,20 @@ public class SocketClient {
         this.serverHost = serverHost;
     }
 
+    private String encode(String text) {
+        if (text == null) return "";
+        return text.replace("|", "&#124;")   // 파이프 변환
+                .replace(":", "&#58;")    // 콜론 변환
+                .replace("\n", "&#10;");  // 줄바꿈 변환
+    }
+
+    private String decode(String text) {
+        if (text == null) return "";
+        return text.replace("&#124;", "|")
+                .replace("&#58;", ":")
+                .replace("&#10;", "\n");
+    }
+
     public boolean connect(Long userId, String nickname) {
         try {
             socket = new Socket(serverHost, SERVER_PORT);
@@ -102,7 +116,7 @@ public class SocketClient {
     }
 
     public void sendChatMessage(String message) {
-        sendMessage("CHAT:" + message);
+        sendMessage("CHAT:" + encode(message));
     }
 
     public void sendPostRead(Long postId) {
@@ -189,7 +203,7 @@ public class SocketClient {
     }
 
     public String createPost(Long roomId, String title, String content, String postType) {
-        return sendRequestAndWaitResponse("CREATE_POST|" + roomId + "|" + title + "|" + content + "|" + postType, "CREATE_POST_RESPONSE");
+        return sendRequestAndWaitResponse("CREATE_POST|" + roomId + "|" + encode(title) + "|" + encode(content) + "|" + postType, "CREATE_POST_RESPONSE");
     }
 
     public String deletePost(Long postId) {
@@ -201,7 +215,7 @@ public class SocketClient {
     }
 
     public String createComment(Long postId, String content) {
-        return sendRequestAndWaitResponse("CREATE_COMMENT|" + postId + "|" + content, "CREATE_COMMENT_RESPONSE");
+        return sendRequestAndWaitResponse("CREATE_COMMENT|" + postId + "|" + encode(content), "CREATE_COMMENT_RESPONSE");
     }
 
     public String getUser(Long userId) {
