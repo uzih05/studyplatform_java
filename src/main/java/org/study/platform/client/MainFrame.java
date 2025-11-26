@@ -119,6 +119,7 @@ public class MainFrame extends JFrame {
             }
         });
 
+        // macOS 닫기 버튼 지원
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
@@ -130,8 +131,11 @@ public class MainFrame extends JFrame {
                 );
 
                 if (confirm == JOptionPane.YES_OPTION) {
-                    socketClient.disconnect();
-                    System.exit(0);
+                    if (socketClient != null) {
+                        socketClient.disconnect();
+                    }
+                    dispose();  // 창만 닫기
+                    System.exit(0);  // 프로그램 종료
                 }
             }
         });
