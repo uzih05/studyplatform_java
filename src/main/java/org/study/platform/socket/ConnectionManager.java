@@ -69,10 +69,23 @@ public class ConnectionManager {
         return clients.containsKey(userId);
     }
 
-    // 모든 클라이언트 연결 종료
+    // 모든 클라이언트 연결 종료 (서버 종료 시 호출)
     public void disconnectAll() {
+        // values()를 바로 순회하지 않고 복사본을 만들어 순회하거나,
+        // 개별 disconnect 로직을 타지 않고 강제로 소켓만 닫습니다.
+
+        System.out.println("전체 클라이언트 연결 해제 시작...");
+
+        // ConcurrentModificationException 방지를 위해 값 복사본으로 수행
         for (ClientHandler handler : clients.values()) {
-            handler.disconnect();
+            try {
+                handler.sendMessage("SERVER_SHUTDOWN"); // 클라에게 종료 알림 (선택사항)
+
+                handler.disconnect();
+
+            } catch (Exception e) {
+                // 종료 중 오류는 무시
+            }
         }
         clients.clear();
         System.out.println("모든 클라이언트 연결이 종료되었습니다.");

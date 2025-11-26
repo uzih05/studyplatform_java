@@ -1,10 +1,11 @@
 package org.study.platform.socket;
 
 import org.springframework.context.ApplicationContext;
-
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors; // 추가된 import
 
 public class SocketServer {
 
@@ -14,19 +15,21 @@ public class SocketServer {
     private ApplicationContext context;
     private volatile boolean running = false;
 
+    // 스레드 풀 추가 (CachedThreadPool은 필요에 따라 스레드 생성 및 재사용)
+    // 서버 사양에 따라 FixedThreadPool(100) 등으로 제한을 걸 수도 있음
+    private final ExecutorService clientExecutor = Executors.newCachedThreadPool();
+
     public SocketServer(ApplicationContext context) {
         this.connectionManager = new ConnectionManager();
         this.context = context;
     }
 
-    // 서버 시작
     public void start() {
         try {
             serverSocket = new ServerSocket(PORT);
             running = true;
             System.out.println("소켓 서버가 포트 " + PORT + "에서 시작되었습니다.");
 
-            // 클라이언트 연결 대기 스레드
             Thread serverThread = new Thread(this::acceptClients);
             serverThread.setDaemon(true);
             serverThread.start();
@@ -36,18 +39,16 @@ public class SocketServer {
         }
     }
 
-    // 클라이언트 연결 수락
     private void acceptClients() {
         while (running) {
             try {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("새로운 클라이언트 연결: " + clientSocket.getInetAddress());
 
-                // 클라이언트 핸들러 생성 및 시작 (ApplicationContext 전달)
                 ClientHandler handler = new ClientHandler(clientSocket, connectionManager, context);
-                Thread handlerThread = new Thread(handler);
-                handlerThread.setDaemon(true);
-                handlerThread.start();
+
+                // 직접 new Thread().start() 하는 대신 스레드 풀에 작업 제출
+                clientExecutor.submit(handler);
 
             } catch (IOException e) {
                 if (running) {
@@ -57,7 +58,6 @@ public class SocketServer {
         }
     }
 
-    // 서버 종료
     public void stop() {
         running = false;
         try {
@@ -65,6 +65,10 @@ public class SocketServer {
                 serverSocket.close();
             }
             connectionManager.disconnectAll();
+
+            // 서버 종료 시 스레드 풀도 종료
+            clientExecutor.shutdownNow();
+
             System.out.println("서버가 종료되었습니다.");
         } catch (IOException e) {
             System.err.println("서버 종료 중 오류: " + e.getMessage());
