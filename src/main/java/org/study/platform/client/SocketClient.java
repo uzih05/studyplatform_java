@@ -7,9 +7,9 @@ import java.util.List;
 
 public class SocketClient {
 
-    private static final String SERVER_HOST = "localhost";
     private static final int SERVER_PORT = 9090;
 
+    private String serverHost;
     private Socket socket;
     private BufferedReader in;
     private PrintWriter out;
@@ -19,48 +19,45 @@ public class SocketClient {
 
     private List<MessageListener> listeners = new ArrayList<>();
 
-    // 메시지 수신 리스너 인터페이스
     public interface MessageListener {
         void onMessageReceived(String message);
     }
 
-    // 서버 연결
+    public SocketClient(String serverHost) {
+        this.serverHost = serverHost;
+    }
+
     public boolean connect(Long userId, String nickname) {
         try {
-            socket = new Socket(SERVER_HOST, SERVER_PORT);
+            socket = new Socket(serverHost, SERVER_PORT);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             out = new PrintWriter(socket.getOutputStream(), true);
 
             this.userId = userId;
             this.nickname = nickname;
 
-            // 인증 메시지 전송
             out.println("AUTH:" + userId + ":" + nickname);
 
-            // 서버 응답 대기
             String response = in.readLine();
             if (response != null && response.equals("CONNECTED:success")) {
                 running = true;
 
-                // 메시지 수신 스레드 시작
                 new Thread(this::receiveMessages).start();
 
-                System.out.println("서버 연결 성공: " + nickname);
+                System.out.println("서버 연결 성공: " + nickname + " (" + serverHost + ")");
                 return true;
             }
 
         } catch (IOException e) {
-            System.err.println("서버 연결 실패: " + e.getMessage());
+            System.err.println("서버 연결 실패 (" + serverHost + "): " + e.getMessage());
         }
         return false;
     }
 
-    // 메시지 수신
     private void receiveMessages() {
         try {
             String message;
             while (running && (message = in.readLine()) != null) {
-                // 리스너들에게 메시지 전달
                 for (MessageListener listener : listeners) {
                     listener.onMessageReceived(message);
                 }
@@ -72,34 +69,28 @@ public class SocketClient {
         }
     }
 
-    // 메시지 전송
     public void sendMessage(String message) {
         if (out != null && running) {
             out.println(message);
         }
     }
 
-    // 채팅 메시지 전송
     public void sendChatMessage(String message) {
         sendMessage("CHAT:" + message);
     }
 
-    // 게시글 읽음 알림
     public void sendPostRead(Long postId) {
         sendMessage("POST_READ:" + postId);
     }
 
-    // 메시지 리스너 추가
     public void addMessageListener(MessageListener listener) {
         listeners.add(listener);
     }
 
-    // 메시지 리스너 제거
     public void removeMessageListener(MessageListener listener) {
         listeners.remove(listener);
     }
 
-    // 연결 종료
     public void disconnect() {
         running = false;
         try {
@@ -112,7 +103,6 @@ public class SocketClient {
         }
     }
 
-    // Getter
     public Long getUserId() {
         return userId;
     }
