@@ -18,9 +18,7 @@ public class ClientLoginFrame extends JFrame {
         this.serverIp = serverIp;
         this.socketClient = new SocketClient(serverIp);
 
-        if (!this.socketClient.startConnection()) {
-            JOptionPane.showMessageDialog(null, "서버에 연결할 수 없습니다. IP를 확인하세요.");
-        }
+        initComponents();
     }
 
     private void initComponents() {
@@ -121,6 +119,14 @@ public class ClientLoginFrame extends JFrame {
             return;
         }
 
+        if (!socketClient.isConnected()) {
+            if (!socketClient.startConnection()) {
+                JOptionPane.showMessageDialog(this, "서버에 연결할 수 없습니다.\nIP를 확인하세요.",
+                        "연결 오류", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }
+
         try {
             // 소켓으로 로그인 요청
             String response = socketClient.login(username, password);
@@ -170,6 +176,14 @@ public class ClientLoginFrame extends JFrame {
             JOptionPane.showMessageDialog(this, "모든 정보를 입력하세요.",
                     "입력 오류", JOptionPane.WARNING_MESSAGE);
             return;
+        }
+
+        if (!socketClient.isConnected()) {
+            if (!socketClient.startConnection()) {
+                JOptionPane.showMessageDialog(this, "서버에 연결할 수 없습니다.\nIP를 확인하세요.",
+                        "연결 오류", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
         }
 
         try {
