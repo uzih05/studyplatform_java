@@ -14,6 +14,7 @@ public class LoginFrame extends JFrame {
     private RoomService roomService;
     private ConfigurableApplicationContext context;
 
+    private JTextField serverIpField;
     private JTextField usernameField;
     private JPasswordField passwordField;
     private JTextField nicknameField;
@@ -30,48 +31,58 @@ public class LoginFrame extends JFrame {
 
     private void initComponents() {
         setTitle("스터디 플랫폼 - 로그인");
-        setSize(400, 300);
+        setSize(400, 350);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // 메인 패널
         JPanel mainPanel = new JPanel();
         mainPanel.setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // 사용자명 라벨
+        // 서버 IP 라벨
         gbc.gridx = 0;
         gbc.gridy = 0;
+        mainPanel.add(new JLabel("서버 IP:"), gbc);
+
+        // 서버 IP 입력
+        serverIpField = new JTextField("localhost", 20);
+        gbc.gridx = 1;
+        gbc.gridy = 0;
+        mainPanel.add(serverIpField, gbc);
+
+        // 사용자명 라벨
+        gbc.gridx = 0;
+        gbc.gridy = 1;
         mainPanel.add(new JLabel("사용자명:"), gbc);
 
         // 사용자명 입력
         usernameField = new JTextField(20);
         gbc.gridx = 1;
-        gbc.gridy = 0;
+        gbc.gridy = 1;
         mainPanel.add(usernameField, gbc);
 
         // 비밀번호 라벨
         gbc.gridx = 0;
-        gbc.gridy = 1;
+        gbc.gridy = 2;
         mainPanel.add(new JLabel("비밀번호:"), gbc);
 
         // 비밀번호 입력
         passwordField = new JPasswordField(20);
         gbc.gridx = 1;
-        gbc.gridy = 1;
+        gbc.gridy = 2;
         mainPanel.add(passwordField, gbc);
 
         // 닉네임 라벨
         gbc.gridx = 0;
-        gbc.gridy = 2;
+        gbc.gridy = 3;
         mainPanel.add(new JLabel("닉네임:"), gbc);
 
         // 닉네임 입력
         nicknameField = new JTextField(20);
         gbc.gridx = 1;
-        gbc.gridy = 2;
+        gbc.gridy = 3;
         mainPanel.add(nicknameField, gbc);
 
         // 버튼 패널
@@ -83,7 +94,7 @@ public class LoginFrame extends JFrame {
         buttonPanel.add(registerButton);
 
         gbc.gridx = 0;
-        gbc.gridy = 3;
+        gbc.gridy = 4;
         gbc.gridwidth = 2;
         mainPanel.add(buttonPanel, gbc);
 
@@ -96,19 +107,26 @@ public class LoginFrame extends JFrame {
         // Enter 키로 로그인
         passwordField.addActionListener(e -> handleLogin());
 
+        // macOS 닫기 버튼 지원
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
                 System.exit(0);
             }
         });
-
     }
 
     // 로그인 처리
     private void handleLogin() {
+        String serverIp = serverIpField.getText().trim();
         String username = usernameField.getText().trim();
         String password = new String(passwordField.getPassword()).trim();
+
+        if (serverIp.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "서버 IP를 입력하세요.",
+                    "입력 오류", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
 
         if (username.isEmpty() || password.isEmpty()) {
             JOptionPane.showMessageDialog(this, "사용자명과 비밀번호를 입력하세요.",
@@ -120,12 +138,12 @@ public class LoginFrame extends JFrame {
             User user = userService.login(username, password);
 
             // 소켓 클라이언트 연결
-            SocketClient socketClient = new SocketClient();
+            SocketClient socketClient = new SocketClient(serverIp);
             if (socketClient.connect(user.getUserId(), user.getNickname())) {
-                // 메인 화면으로 전환
                 openMainFrame(user, socketClient);
             } else {
-                JOptionPane.showMessageDialog(this, "서버 연결에 실패했습니다.",
+                JOptionPane.showMessageDialog(this,
+                        "서버 연결에 실패했습니다.\n서버 IP를 확인하세요: " + serverIp,
                         "연결 실패", JOptionPane.ERROR_MESSAGE);
             }
 
