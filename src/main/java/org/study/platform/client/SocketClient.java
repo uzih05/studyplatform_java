@@ -43,43 +43,36 @@ public class SocketClient {
                 .replace("&#10;", "\n");
     }
 
-    public boolean connect(Long userId, String nickname) {
+    public boolean startConnection() {
         try {
+            if (socket != null && !socket.isClosed()) {
+                return true; // 이미 연결됨
+            }
             socket = new Socket(serverHost, SERVER_PORT);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             out = new PrintWriter(socket.getOutputStream(), true);
+            running = true;
 
-            this.userId = userId;
-            this.nickname = nickname;
+            // 메시지 수신 스레드 시작 (로그인 응답을 받아야 하므로 여기서 시작해야 함)
+            Thread receiverThread = new Thread(this::receiveMessages);
+            receiverThread.setDaemon(true);
+            receiverThread.start();
 
-            // AUTH 메시지 전송
-            out.println("AUTH:" + userId + ":" + nickname);
-            out.flush();  // 추가
-
-            // 서버 응답 대기 (타임아웃 추가)
-            socket.setSoTimeout(3000);  // 3초 타임아웃
-            String response = in.readLine();
-            socket.setSoTimeout(0);  // 타임아웃 해제
-
-            if (response != null && response.equals("CONNECTED:success")) {
-                running = true;
-
-                // 메시지 수신 스레드 시작
-                Thread receiverThread = new Thread(this::receiveMessages);
-                receiverThread.setDaemon(true);
-                receiverThread.start();
-
-                System.out.println("서버 연결 성공: " + nickname + " (" + serverHost + ")");
-                return true;
-            } else {
-                System.err.println("서버 응답 실패: " + response);
-            }
-
+            System.out.println("서버 연결 성공 (인증 전): " + serverHost);
+            return true;
         } catch (IOException e) {
-            System.err.println("서버 연결 실패 (" + serverHost + "): " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("서버 연결 실패: " + e.getMessage());
+            return false;
         }
-        return false;
+    }
+
+    public boolean authenticate(Long userId, String nickname) {
+        this.userId = userId;
+        this.nickname = nickname;
+
+        sendMessage("AUTH:" + userId + ":" + nickname);
+
+        return true;
     }
 
     // receiveMessages 메서드

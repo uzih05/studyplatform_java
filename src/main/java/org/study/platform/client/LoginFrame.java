@@ -141,7 +141,7 @@ public class LoginFrame extends JFrame {
             SocketClient socketClient = new SocketClient(serverIp);
 
             // AUTH 메시지로 연결 (LOGIN이 아닌 AUTH 사용)
-            if (socketClient.connect(user.getUserId(), user.getNickname())) {
+            if (socketClient.authenticate(user.getUserId(), user.getNickname())) {
                 openMainFrame(user, socketClient);
             } else {
                 JOptionPane.showMessageDialog(this,

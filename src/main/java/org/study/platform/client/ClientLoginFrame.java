@@ -17,7 +17,10 @@ public class ClientLoginFrame extends JFrame {
     public ClientLoginFrame(String serverIp) {
         this.serverIp = serverIp;
         this.socketClient = new SocketClient(serverIp);
-        initComponents();
+
+        if (!this.socketClient.startConnection()) {
+            JOptionPane.showMessageDialog(null, "서버에 연결할 수 없습니다. IP를 확인하세요.");
+        }
     }
 
     private void initComponents() {
@@ -136,7 +139,7 @@ public class ClientLoginFrame extends JFrame {
                 String nickname = parts[3];
 
                 // AUTH 메시지로 소켓 연결 활성화
-                if (socketClient.connect(userId, nickname)) {
+                if (socketClient.authenticate(userId, nickname)) {
                     // 메인 화면으로 전환
                     openMainFrame(userId, nickname);
                 } else {
