@@ -29,7 +29,8 @@ public class MainFrame extends JFrame {
     private JButton deleteRoomButton;
     private JButton refreshButton;
     private JLabel userInfoLabel;
-    private JTextArea onlineUsersArea;
+
+    private SocketClient.MessageListener messageListener;
 
     public MainFrame(RoomService roomService, UserService userService, ConfigurableApplicationContext context) {
         this.roomService = roomService;
@@ -42,28 +43,29 @@ public class MainFrame extends JFrame {
         this.socketClient = socketClient;
         initComponents();
         loadRooms();
-        setupSocketListener();
+        setupRealtimeListener();
     }
 
     private void initComponents() {
         setTitle("스터디 플랫폼 - 메인");
-        setSize(800, 600);
+        setSize(700, 500);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setLocationRelativeTo(null);
-        setLayout(new BorderLayout());
+        setLayout(new BorderLayout(10, 10));
 
         // 상단 패널
         JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
         userInfoLabel = new JLabel("사용자: " + currentUser.getNickname() + " (ID: " + currentUser.getUserId() + ")");
-        userInfoLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        userInfoLabel.setFont(new Font("Dialog", Font.BOLD, 14));
         topPanel.add(userInfoLabel, BorderLayout.WEST);
         add(topPanel, BorderLayout.NORTH);
 
-        // 중앙 패널
-        JPanel centerPanel = new JPanel(new BorderLayout());
-        centerPanel.setBorder(BorderFactory.createTitledBorder("스터디 방 목록"));
+        // 중앙 패널 (방 목록)
+        JPanel centerPanel = new JPanel(new BorderLayout(5, 5));
+        centerPanel.setBorder(BorderFactory.createTitledBorder("📚 스터디 방 목록"));
 
-        // 테이블 생성
+        // 테이블
         String[] columnNames = {"방 ID", "방 이름", "방장", "생성일"};
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
@@ -73,11 +75,17 @@ public class MainFrame extends JFrame {
         };
         roomTable = new JTable(tableModel);
         roomTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        roomTable.setRowHeight(25);
+        roomTable.getColumnModel().getColumn(0).setPreferredWidth(60);
+        roomTable.getColumnModel().getColumn(1).setPreferredWidth(250);
+        roomTable.getColumnModel().getColumn(2).setPreferredWidth(100);
+        roomTable.getColumnModel().getColumn(3).setPreferredWidth(150);
+
         JScrollPane tableScrollPane = new JScrollPane(roomTable);
         centerPanel.add(tableScrollPane, BorderLayout.CENTER);
 
         // 버튼 패널
-        JPanel buttonPanel = new JPanel();
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         createRoomButton = new JButton("방 만들기");
         enterRoomButton = new JButton("입장");
         deleteRoomButton = new JButton("삭제");
@@ -90,18 +98,6 @@ public class MainFrame extends JFrame {
         centerPanel.add(buttonPanel, BorderLayout.SOUTH);
 
         add(centerPanel, BorderLayout.CENTER);
-
-        // 우측 패널
-        JPanel rightPanel = new JPanel(new BorderLayout());
-        rightPanel.setBorder(BorderFactory.createTitledBorder("현재 접속자"));
-        rightPanel.setPreferredSize(new Dimension(200, 0));
-
-        onlineUsersArea = new JTextArea();
-        onlineUsersArea.setEditable(false);
-        JScrollPane usersScrollPane = new JScrollPane(onlineUsersArea);
-        rightPanel.add(usersScrollPane, BorderLayout.CENTER);
-
-        add(rightPanel, BorderLayout.EAST);
 
         // 이벤트 리스너
         createRoomButton.addActionListener(e -> handleCreateRoom());
@@ -119,8 +115,7 @@ public class MainFrame extends JFrame {
             }
         });
 
-        // 닫기 버튼 지원
-        // macOS 닫기 버튼 지원
+        // 닫기 처리
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
@@ -132,48 +127,33 @@ public class MainFrame extends JFrame {
                 );
 
                 if (confirm == JOptionPane.YES_OPTION) {
-                    // 강제 종료 (별도 스레드에서)
                     new Thread(() -> {
                         try {
                             if (socketClient != null) {
                                 socketClient.disconnect();
                             }
-                            Thread.sleep(500);  // 정리 시간
+                            Thread.sleep(500);
                         } catch (Exception e) {
                             // 무시
                         }
                         System.exit(0);
                     }).start();
-
                     dispose();
                 }
             }
         });
     }
 
-    // 소켓 리스너 설정
-    private void setupSocketListener() {
-        socketClient.addMessageListener(message -> {
+    // 실시간 리스너 설정
+    private void setupRealtimeListener() {
+        messageListener = message -> {
             SwingUtilities.invokeLater(() -> {
-                if (message.startsWith("USERLIST:")) {
-                    updateOnlineUsers(message.substring(9));
+                if (message.startsWith("NEW_ROOM:") || message.startsWith("ROOM_DELETED:")) {
+                    loadRooms();
                 }
             });
-        });
-    }
-
-    // 접속자 목록 업데이트
-    private void updateOnlineUsers(String userListData) {
-        onlineUsersArea.setText("");
-        if (!userListData.isEmpty()) {
-            String[] users = userListData.split(",");
-            for (String user : users) {
-                String[] userData = user.split(":");
-                if (userData.length == 2) {
-                    onlineUsersArea.append(userData[1] + "\n");
-                }
-            }
-        }
+        };
+        socketClient.addMessageListener(messageListener);
     }
 
     // 방 목록 로드
@@ -182,7 +162,6 @@ public class MainFrame extends JFrame {
         try {
             List<Room> rooms = roomService.findAllRooms();
             for (Room room : rooms) {
-                // 방장 닉네임 가져오기
                 String creatorName = userService.findById(room.getCreatorId())
                         .map(User::getNickname).orElse("알 수 없음");
 
@@ -236,10 +215,7 @@ public class MainFrame extends JFrame {
                         "오류", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-
-            // RoomFrame 열기
             openRoomFrame(room);
-
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "방 입장 실패: " + ex.getMessage(),
                     "오류", JOptionPane.ERROR_MESSAGE);
@@ -249,7 +225,6 @@ public class MainFrame extends JFrame {
     // RoomFrame 열기
     private void openRoomFrame(Room room) {
         SwingUtilities.invokeLater(() -> {
-            // Spring Context에서 Service들 가져오기
             PostService postService = context.getBean(PostService.class);
             CommentService commentService = context.getBean(CommentService.class);
             PostReadStatusService postReadStatusService = context.getBean(PostReadStatusService.class);
@@ -271,7 +246,6 @@ public class MainFrame extends JFrame {
 
         Long roomId = (Long) tableModel.getValueAt(selectedRow, 0);
 
-        // 실제 Room 객체에서 creatorId 가져오기
         try {
             Room room = roomService.findById(roomId).orElse(null);
             if (room == null) {
@@ -280,7 +254,6 @@ public class MainFrame extends JFrame {
                 return;
             }
 
-            // 방장 확인
             if (!room.getCreatorId().equals(currentUser.getUserId())) {
                 JOptionPane.showMessageDialog(this, "방장만 삭제할 수 있습니다.",
                         "권한 없음", JOptionPane.WARNING_MESSAGE);
