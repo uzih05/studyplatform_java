@@ -32,10 +32,8 @@ public class File {
         uploadedAt = LocalDateTime.now();
     }
 
-    // 기본 생성자
     public File() {}
 
-    // 생성자
     public File(Long postId, String fileName, String filePath, Long fileSize) {
         this.postId = postId;
         this.fileName = fileName;
@@ -43,7 +41,6 @@ public class File {
         this.fileSize = fileSize;
     }
 
-    // Getter, Setter
     public Long getFileId() { return fileId; }
     public void setFileId(Long fileId) { this.fileId = fileId; }
 
