@@ -31,9 +31,9 @@ public class SocketClient {
 
     private String encode(String text) {
         if (text == null) return "";
-        return text.replace("|", "&#124;")   // 파이프 변환
-                .replace(":", "&#58;")    // 콜론 변환
-                .replace("\n", "&#10;");  // 줄바꿈 변환
+        return text.replace("|", "&#124;")
+                .replace(":", "&#58;")
+                .replace("\n", "&#10;");
     }
 
     private String decode(String text) {
@@ -46,19 +46,18 @@ public class SocketClient {
     public boolean startConnection() {
         try {
             if (socket != null && !socket.isClosed()) {
-                return true; // 이미 연결됨
+                return true;
             }
             socket = new Socket(serverHost, SERVER_PORT);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             out = new PrintWriter(socket.getOutputStream(), true);
             running = true;
 
-            // 메시지 수신 스레드 시작 (로그인 응답을 받아야 하므로 여기서 시작해야 함)
             Thread receiverThread = new Thread(this::receiveMessages);
             receiverThread.setDaemon(true);
             receiverThread.start();
 
-            System.out.println("서버 연결 성공 (인증 전): " + serverHost);
+            System.out.println("서버 연결 성공: " + serverHost);
             return true;
         } catch (IOException e) {
             System.err.println("서버 연결 실패: " + e.getMessage());
@@ -70,19 +69,23 @@ public class SocketClient {
         this.userId = userId;
         this.nickname = nickname;
 
-        sendMessage("AUTH:" + userId + ":" + nickname);
+        if (!isConnected()) {
+            if (!startConnection()) {
+                return false;
+            }
+        }
 
+        sendMessage("AUTH:" + userId + ":" + nickname);
         return true;
     }
 
-    // receiveMessages 메서드
     private void receiveMessages() {
         try {
             String message;
             while (running && (message = in.readLine()) != null) {
                 final String finalMessage = message;
 
-                // 응답 메시지인 경우 (|로 구분된 메시지)
+                // 응답 메시지인 경우
                 if (message.contains("|") && message.contains("_RESPONSE")) {
                     synchronized (responseLock) {
                         lastResponse = message;
@@ -90,9 +93,13 @@ public class SocketClient {
                     }
                 }
 
-                // 리스너들에게 메시지 전달
-                for (MessageListener listener : listeners) {
-                    listener.onMessageReceived(finalMessage);
+                // 리스너들에게 메시지 전달 (실시간 업데이트용)
+                for (MessageListener listener : new ArrayList<>(listeners)) {
+                    try {
+                        listener.onMessageReceived(finalMessage);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         } catch (IOException e) {
@@ -148,20 +155,17 @@ public class SocketClient {
         return running && socket != null && !socket.isClosed();
     }
 
-    // 동기 요청/응답 메서드 (기존 receiveMessages 메서드 아래에 추가)
     public String sendRequestAndWaitResponse(String request, String expectedResponsePrefix) {
         synchronized (responseLock) {
             lastResponse = null;
             sendMessage(request);
 
             try {
-                // 응답 대기 (최대 5초)
                 responseLock.wait(5000);
 
                 if (lastResponse != null && lastResponse.startsWith(expectedResponsePrefix)) {
                     return lastResponse;
                 }
-
                 return null;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -170,7 +174,7 @@ public class SocketClient {
         }
     }
 
-    // 편의 메서드들 추가
+    // 기본 요청 메서드들
     public String login(String username, String password) {
         return sendRequestAndWaitResponse("LOGIN|" + username + "|" + password, "LOGIN_RESPONSE");
     }
@@ -191,8 +195,24 @@ public class SocketClient {
         return sendRequestAndWaitResponse("DELETE_ROOM|" + roomId, "DELETE_ROOM_RESPONSE");
     }
 
+    public String joinRoom(Long roomId) {
+        return sendRequestAndWaitResponse("JOIN_ROOM|" + roomId, "JOIN_ROOM_RESPONSE");
+    }
+
+    public String leaveRoom(Long roomId) {
+        return sendRequestAndWaitResponse("LEAVE_ROOM|" + roomId, "LEAVE_ROOM_RESPONSE");
+    }
+
     public String getPosts(Long roomId) {
         return sendRequestAndWaitResponse("GET_POSTS|" + roomId, "GET_POSTS_RESPONSE");
+    }
+
+    public String getNotices(Long roomId) {
+        return sendRequestAndWaitResponse("GET_NOTICES|" + roomId, "GET_NOTICES_RESPONSE");
+    }
+
+    public String getGeneralPosts(Long roomId) {
+        return sendRequestAndWaitResponse("GET_GENERAL_POSTS|" + roomId, "GET_GENERAL_POSTS_RESPONSE");
     }
 
     public String createPost(Long roomId, String title, String content, String postType) {
@@ -201,6 +221,10 @@ public class SocketClient {
 
     public String deletePost(Long postId) {
         return sendRequestAndWaitResponse("DELETE_POST|" + postId, "DELETE_POST_RESPONSE");
+    }
+
+    public String getPostDetail(Long postId) {
+        return sendRequestAndWaitResponse("GET_POST_DETAIL|" + postId, "GET_POST_DETAIL_RESPONSE");
     }
 
     public String getComments(Long postId) {
@@ -221,5 +245,39 @@ public class SocketClient {
 
     public String getReadStatus(Long postId) {
         return sendRequestAndWaitResponse("GET_READ_STATUS|" + postId, "GET_READ_STATUS_RESPONSE");
+    }
+
+    // 과제 관련 메서드
+    public String createAssignment(Long postId, String title, String description, String dueDate) {
+        String dueDateParam = dueDate != null ? dueDate : "";
+        return sendRequestAndWaitResponse("CREATE_ASSIGNMENT|" + postId + "|" + encode(title) + "|" + encode(description) + "|" + dueDateParam, "CREATE_ASSIGNMENT_RESPONSE");
+    }
+
+    public String getAssignment(Long postId) {
+        return sendRequestAndWaitResponse("GET_ASSIGNMENT|" + postId, "GET_ASSIGNMENT_RESPONSE");
+    }
+
+    public String submitAssignment(Long assignmentId, String content, String fileName, String filePath, Long fileSize) {
+        String fileNameParam = fileName != null ? encode(fileName) : "";
+        String filePathParam = filePath != null ? filePath : "";
+        String fileSizeParam = fileSize != null ? fileSize.toString() : "";
+        return sendRequestAndWaitResponse("SUBMIT_ASSIGNMENT|" + assignmentId + "|" + encode(content) + "|" + fileNameParam + "|" + filePathParam + "|" + fileSizeParam, "SUBMIT_ASSIGNMENT_RESPONSE");
+    }
+
+    public String getSubmissions(Long assignmentId) {
+        return sendRequestAndWaitResponse("GET_SUBMISSIONS|" + assignmentId, "GET_SUBMISSIONS_RESPONSE");
+    }
+
+    public String getMySubmission(Long assignmentId) {
+        return sendRequestAndWaitResponse("GET_MY_SUBMISSION|" + assignmentId, "GET_MY_SUBMISSION_RESPONSE");
+    }
+
+    public String gradeSubmission(Long submissionId, Integer score, String feedback) {
+        String scoreParam = score != null ? score.toString() : "";
+        return sendRequestAndWaitResponse("GRADE_SUBMISSION|" + submissionId + "|" + scoreParam + "|" + encode(feedback), "GRADE_SUBMISSION_RESPONSE");
+    }
+
+    public String decodeText(String text) {
+        return decode(text);
     }
 }
