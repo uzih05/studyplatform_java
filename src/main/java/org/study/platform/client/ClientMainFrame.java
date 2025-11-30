@@ -3,8 +3,6 @@ package org.study.platform.client;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.List;
 
 public class ClientMainFrame extends JFrame {
 
@@ -19,7 +17,8 @@ public class ClientMainFrame extends JFrame {
     private JButton deleteRoomButton;
     private JButton refreshButton;
     private JLabel userInfoLabel;
-    private JTextArea onlineUsersArea;
+
+    private SocketClient.MessageListener messageListener;
 
     public ClientMainFrame(SocketClient socketClient, Long userId, String nickname) {
         this.socketClient = socketClient;
@@ -27,26 +26,27 @@ public class ClientMainFrame extends JFrame {
         this.currentUserNickname = nickname;
         initComponents();
         loadRooms();
-        setupSocketListener();
+        setupRealtimeListener();
     }
 
     private void initComponents() {
         setTitle("스터디 플랫폼 - 클라이언트");
-        setSize(800, 600);
+        setSize(700, 500);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setLocationRelativeTo(null);
-        setLayout(new BorderLayout());
+        setLayout(new BorderLayout(10, 10));
 
         // 상단 패널
         JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
         userInfoLabel = new JLabel("사용자: " + currentUserNickname + " (ID: " + currentUserId + ")");
-        userInfoLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        userInfoLabel.setFont(new Font("Dialog", Font.BOLD, 14));
         topPanel.add(userInfoLabel, BorderLayout.WEST);
         add(topPanel, BorderLayout.NORTH);
 
         // 중앙 패널
-        JPanel centerPanel = new JPanel(new BorderLayout());
-        centerPanel.setBorder(BorderFactory.createTitledBorder("스터디 방 목록"));
+        JPanel centerPanel = new JPanel(new BorderLayout(5, 5));
+        centerPanel.setBorder(BorderFactory.createTitledBorder("📚 스터디 방 목록"));
 
         // 테이블
         String[] columnNames = {"방 ID", "방 이름", "방장", "생성일"};
@@ -58,11 +58,12 @@ public class ClientMainFrame extends JFrame {
         };
         roomTable = new JTable(tableModel);
         roomTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        roomTable.setRowHeight(25);
         JScrollPane tableScrollPane = new JScrollPane(roomTable);
         centerPanel.add(tableScrollPane, BorderLayout.CENTER);
 
         // 버튼 패널
-        JPanel buttonPanel = new JPanel();
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         createRoomButton = new JButton("방 만들기");
         enterRoomButton = new JButton("입장");
         deleteRoomButton = new JButton("삭제");
@@ -76,25 +77,12 @@ public class ClientMainFrame extends JFrame {
 
         add(centerPanel, BorderLayout.CENTER);
 
-        // 우측 패널
-        JPanel rightPanel = new JPanel(new BorderLayout());
-        rightPanel.setBorder(BorderFactory.createTitledBorder("현재 접속자"));
-        rightPanel.setPreferredSize(new Dimension(200, 0));
-
-        onlineUsersArea = new JTextArea();
-        onlineUsersArea.setEditable(false);
-        JScrollPane usersScrollPane = new JScrollPane(onlineUsersArea);
-        rightPanel.add(usersScrollPane, BorderLayout.CENTER);
-
-        add(rightPanel, BorderLayout.EAST);
-
-        // 이벤트 리스너
+        // 이벤트
         createRoomButton.addActionListener(e -> handleCreateRoom());
         enterRoomButton.addActionListener(e -> handleEnterRoom());
         deleteRoomButton.addActionListener(e -> handleDeleteRoom());
         refreshButton.addActionListener(e -> loadRooms());
 
-        // 더블클릭으로 입장
         roomTable.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent evt) {
@@ -104,7 +92,6 @@ public class ClientMainFrame extends JFrame {
             }
         });
 
-        // 종료 처리
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
@@ -122,42 +109,25 @@ public class ClientMainFrame extends JFrame {
                         }
                         System.exit(0);
                     }).start();
-
                     dispose();
                 }
             }
         });
     }
 
-    // 소켓 리스너 설정
-    private void setupSocketListener() {
-        socketClient.addMessageListener(message -> {
+    private void setupRealtimeListener() {
+        messageListener = message -> {
             SwingUtilities.invokeLater(() -> {
-                if (message.startsWith("USERLIST:")) {
-                    updateOnlineUsers(message.substring(9));
+                if (message.startsWith("NEW_ROOM:") || message.startsWith("ROOM_DELETED:")) {
+                    loadRooms();
                 }
             });
-        });
+        };
+        socketClient.addMessageListener(messageListener);
     }
 
-    // 접속자 목록 업데이트
-    private void updateOnlineUsers(String userListData) {
-        onlineUsersArea.setText("");
-        if (!userListData.isEmpty()) {
-            String[] users = userListData.split(",");
-            for (String user : users) {
-                String[] userData = user.split(":");
-                if (userData.length == 2) {
-                    onlineUsersArea.append(userData[1] + "\n");
-                }
-            }
-        }
-    }
-
-    // 방 목록 로드
     private void loadRooms() {
         tableModel.setRowCount(0);
-
         try {
             String response = socketClient.getRooms();
 
@@ -170,21 +140,19 @@ public class ClientMainFrame extends JFrame {
             String[] parts = response.split("\\|");
 
             if (parts.length >= 2 && parts[1].equals("SUCCESS")) {
-                // 방 목록 파싱
                 for (int i = 2; i < parts.length; i++) {
                     String[] roomData = parts[i].split(":");
                     if (roomData.length >= 5) {
                         Object[] row = {
-                                Long.parseLong(roomData[0]),  // roomId
-                                roomData[1],                   // roomName
-                                roomData[3],                   // creatorName
-                                roomData[4]                    // createdAt
+                                Long.parseLong(roomData[0]),
+                                roomData[1],
+                                roomData[3],
+                                roomData[4]
                         };
                         tableModel.addRow(row);
                     }
                 }
             }
-
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "방 목록 로드 실패: " + ex.getMessage(),
                     "오류", JOptionPane.ERROR_MESSAGE);
@@ -192,7 +160,6 @@ public class ClientMainFrame extends JFrame {
         }
     }
 
-    // 방 만들기
     private void handleCreateRoom() {
         String roomName = JOptionPane.showInputDialog(this, "방 이름을 입력하세요:",
                 "방 만들기", JOptionPane.PLAIN_MESSAGE);
@@ -218,7 +185,6 @@ public class ClientMainFrame extends JFrame {
                     JOptionPane.showMessageDialog(this, errorMsg,
                             "오류", JOptionPane.ERROR_MESSAGE);
                 }
-
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "방 생성 실패: " + ex.getMessage(),
                         "오류", JOptionPane.ERROR_MESSAGE);
@@ -226,7 +192,6 @@ public class ClientMainFrame extends JFrame {
         }
     }
 
-    // 방 입장
     private void handleEnterRoom() {
         int selectedRow = roomTable.getSelectedRow();
         if (selectedRow == -1) {
@@ -238,14 +203,12 @@ public class ClientMainFrame extends JFrame {
         Long roomId = (Long) tableModel.getValueAt(selectedRow, 0);
         String roomName = (String) tableModel.getValueAt(selectedRow, 1);
 
-        // RoomFrame 열기
         SwingUtilities.invokeLater(() -> {
             ClientRoomFrame roomFrame = new ClientRoomFrame(socketClient, currentUserId, currentUserNickname, roomId, roomName);
             roomFrame.setVisible(true);
         });
     }
 
-    // 방 삭제
     private void handleDeleteRoom() {
         int selectedRow = roomTable.getSelectedRow();
         if (selectedRow == -1) {
@@ -280,7 +243,6 @@ public class ClientMainFrame extends JFrame {
                     JOptionPane.showMessageDialog(this, errorMsg,
                             "오류", JOptionPane.ERROR_MESSAGE);
                 }
-
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "방 삭제 실패: " + ex.getMessage(),
                         "오류", JOptionPane.ERROR_MESSAGE);
