@@ -26,16 +26,13 @@ public class PostReadStatus {
         readAt = LocalDateTime.now();
     }
 
-    // 기본 생성자
     public PostReadStatus() {}
 
-    // 생성자
     public PostReadStatus(Long postId, Long userId) {
         this.postId = postId;
         this.userId = userId;
     }
 
-    // Getter, Setter
     public Long getReadId() { return readId; }
     public void setReadId(Long readId) { this.readId = readId; }
 
