@@ -28,13 +28,15 @@ public class Post {
     @Column(name = "post_type", nullable = false, length = 20)
     private PostType postType;
 
+    @Column(name = "has_assignment", nullable = false)
+    private Boolean hasAssignment = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // PostType enum
     public enum PostType {
         NOTICE,
         GENERAL
@@ -51,10 +53,8 @@ public class Post {
         updatedAt = LocalDateTime.now();
     }
 
-    // 기본 생성자
     public Post() {}
 
-    // 생성자
     public Post(Long roomId, Long authorId, String title, String content, PostType postType) {
         this.roomId = roomId;
         this.authorId = authorId;
@@ -63,7 +63,6 @@ public class Post {
         this.postType = postType;
     }
 
-    // Getter, Setter
     public Long getPostId() { return postId; }
     public void setPostId(Long postId) { this.postId = postId; }
 
@@ -81,6 +80,9 @@ public class Post {
 
     public PostType getPostType() { return postType; }
     public void setPostType(PostType postType) { this.postType = postType; }
+
+    public Boolean getHasAssignment() { return hasAssignment; }
+    public void setHasAssignment(Boolean hasAssignment) { this.hasAssignment = hasAssignment; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
