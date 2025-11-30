@@ -29,17 +29,14 @@ public class User {
         createdAt = LocalDateTime.now();
     }
 
-    // 기본 생성자
     public User() {}
 
-    // 생성자
     public User(String username, String password, String nickname) {
         this.username = username;
         this.password = password;
         this.nickname = nickname;
     }
 
-    // Getter, Setter
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
 
