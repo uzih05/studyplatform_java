@@ -16,7 +16,6 @@ import javax.swing.JOptionPane;
 public class StudyplatformApplication {
 
     public static void main(String[] args) {
-        // 실행 모드 선택
         String mode = showModeSelectionDialog();
 
         if (mode == null) {
@@ -31,7 +30,6 @@ public class StudyplatformApplication {
         }
     }
 
-    // 모드 선택 다이얼로그
     private static String showModeSelectionDialog() {
         String[] options = {"서버 모드", "클라이언트 모드"};
         int choice = JOptionPane.showOptionDialog(
@@ -50,11 +48,9 @@ public class StudyplatformApplication {
         return null;
     }
 
-    // 서버 모드 시작
     private static void startServerMode(String[] args) {
         ConfigurableApplicationContext context = SpringApplication.run(StudyplatformApplication.class, args);
 
-        // ApplicationContext 전달하여 SocketServer 생성
         SocketServer socketServer = new SocketServer(context);
         socketServer.start();
 
@@ -75,7 +71,6 @@ public class StudyplatformApplication {
 
     private static void startClientMode(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            // 서버 IP 입력
             String serverIp = JOptionPane.showInputDialog(
                     null,
                     "서버 IP를 입력하세요:",
@@ -89,7 +84,6 @@ public class StudyplatformApplication {
                 return;
             }
 
-            // ClientLoginFrame 생성
             ClientLoginFrame loginFrame = new ClientLoginFrame(serverIp.trim());
             loginFrame.setVisible(true);
         });
