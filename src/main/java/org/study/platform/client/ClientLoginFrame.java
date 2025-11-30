@@ -17,7 +17,6 @@ public class ClientLoginFrame extends JFrame {
     public ClientLoginFrame(String serverIp) {
         this.serverIp = serverIp;
         this.socketClient = new SocketClient(serverIp);
-
         initComponents();
     }
 
@@ -33,7 +32,7 @@ public class ClientLoginFrame extends JFrame {
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // 서버 정보 라벨
+        // 서버 정보
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.gridwidth = 2;
@@ -43,44 +42,40 @@ public class ClientLoginFrame extends JFrame {
 
         gbc.gridwidth = 1;
 
-        // 사용자명 라벨
+        // 사용자명
         gbc.gridx = 0;
         gbc.gridy = 1;
         mainPanel.add(new JLabel("사용자명:"), gbc);
 
-        // 사용자명 입력
         usernameField = new JTextField(20);
         gbc.gridx = 1;
         gbc.gridy = 1;
         mainPanel.add(usernameField, gbc);
 
-        // 비밀번호 라벨
+        // 비밀번호
         gbc.gridx = 0;
         gbc.gridy = 2;
         mainPanel.add(new JLabel("비밀번호:"), gbc);
 
-        // 비밀번호 입력
         passwordField = new JPasswordField(20);
         gbc.gridx = 1;
         gbc.gridy = 2;
         mainPanel.add(passwordField, gbc);
 
-        // 닉네임 라벨
+        // 닉네임
         gbc.gridx = 0;
         gbc.gridy = 3;
         mainPanel.add(new JLabel("닉네임:"), gbc);
 
-        // 닉네임 입력
         nicknameField = new JTextField(20);
         gbc.gridx = 1;
         gbc.gridy = 3;
         mainPanel.add(nicknameField, gbc);
 
-        // 버튼 패널
+        // 버튼
         JPanel buttonPanel = new JPanel();
         loginButton = new JButton("로그인");
         registerButton = new JButton("회원가입");
-
         buttonPanel.add(loginButton);
         buttonPanel.add(registerButton);
 
@@ -91,12 +86,11 @@ public class ClientLoginFrame extends JFrame {
 
         add(mainPanel);
 
-        // 이벤트 리스너
+        // 이벤트
         loginButton.addActionListener(e -> handleLogin());
         registerButton.addActionListener(e -> handleRegister());
         passwordField.addActionListener(e -> handleLogin());
 
-        // macOS 닫기 버튼
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
@@ -108,7 +102,6 @@ public class ClientLoginFrame extends JFrame {
         });
     }
 
-    // 로그인 처리
     private void handleLogin() {
         String username = usernameField.getText().trim();
         String password = new String(passwordField.getPassword()).trim();
@@ -128,7 +121,6 @@ public class ClientLoginFrame extends JFrame {
         }
 
         try {
-            // 소켓으로 로그인 요청
             String response = socketClient.login(username, password);
 
             if (response == null) {
@@ -140,20 +132,16 @@ public class ClientLoginFrame extends JFrame {
             String[] parts = response.split("\\|");
 
             if (parts.length >= 2 && parts[1].equals("SUCCESS")) {
-                // 로그인 성공
                 Long userId = Long.parseLong(parts[2]);
                 String nickname = parts[3];
 
-                // AUTH 메시지로 소켓 연결 활성화
                 if (socketClient.authenticate(userId, nickname)) {
-                    // 메인 화면으로 전환
                     openMainFrame(userId, nickname);
                 } else {
                     JOptionPane.showMessageDialog(this, "서버 연결 실패",
                             "연결 오류", JOptionPane.ERROR_MESSAGE);
                 }
             } else {
-                // 로그인 실패
                 String errorMsg = parts.length >= 3 ? parts[2] : "로그인 실패";
                 JOptionPane.showMessageDialog(this, errorMsg,
                         "로그인 실패", JOptionPane.ERROR_MESSAGE);
@@ -166,7 +154,6 @@ public class ClientLoginFrame extends JFrame {
         }
     }
 
-    // 회원가입 처리
     private void handleRegister() {
         String username = usernameField.getText().trim();
         String password = new String(passwordField.getPassword()).trim();
@@ -187,7 +174,6 @@ public class ClientLoginFrame extends JFrame {
         }
 
         try {
-            // 소켓으로 회원가입 요청
             String response = socketClient.register(username, password, nickname);
 
             if (response == null) {
@@ -199,15 +185,12 @@ public class ClientLoginFrame extends JFrame {
             String[] parts = response.split("\\|");
 
             if (parts.length >= 2 && parts[1].equals("SUCCESS")) {
-                // 회원가입 성공
                 JOptionPane.showMessageDialog(this, "회원가입이 완료되었습니다. 로그인하세요.",
                         "회원가입 성공", JOptionPane.INFORMATION_MESSAGE);
-
                 nicknameField.setText("");
                 passwordField.setText("");
                 usernameField.requestFocus();
             } else {
-                // 회원가입 실패
                 String errorMsg = parts.length >= 3 ? parts[2] : "회원가입 실패";
                 JOptionPane.showMessageDialog(this, errorMsg,
                         "회원가입 실패", JOptionPane.ERROR_MESSAGE);
@@ -220,10 +203,8 @@ public class ClientLoginFrame extends JFrame {
         }
     }
 
-    // 메인 화면 열기
     private void openMainFrame(Long userId, String nickname) {
         this.dispose();
-
         SwingUtilities.invokeLater(() -> {
             ClientMainFrame mainFrame = new ClientMainFrame(socketClient, userId, nickname);
             mainFrame.setVisible(true);
