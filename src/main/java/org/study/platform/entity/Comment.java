@@ -29,17 +29,14 @@ public class Comment {
         createdAt = LocalDateTime.now();
     }
 
-    // 기본 생성자
     public Comment() {}
 
-    // 생성자
     public Comment(Long postId, Long authorId, String content) {
         this.postId = postId;
         this.authorId = authorId;
         this.content = content;
     }
 
-    // Getter, Setter
     public Long getCommentId() { return commentId; }
     public void setCommentId(Long commentId) { this.commentId = commentId; }
 
