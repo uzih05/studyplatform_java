@@ -7,10 +7,6 @@ import java.util.List;
 
 @Repository
 public interface RoomRepository extends JpaRepository<Room, Long> {
-
-    // 방 이름으로 검색
     List<Room> findByRoomNameContaining(String roomName);
-
-    // 생성자 ID로 방 목록 조회
     List<Room> findByCreatorId(Long creatorId);
 }
