@@ -26,16 +26,13 @@ public class Room {
         createdAt = LocalDateTime.now();
     }
 
-    // 기본 생성자
     public Room() {}
 
-    // 생성자
     public Room(String roomName, Long creatorId) {
         this.roomName = roomName;
         this.creatorId = creatorId;
     }
 
-    // Getter, Setter
     public Long getRoomId() { return roomId; }
     public void setRoomId(Long roomId) { this.roomId = roomId; }
 
