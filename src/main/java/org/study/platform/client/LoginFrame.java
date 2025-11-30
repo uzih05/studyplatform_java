@@ -21,7 +21,6 @@ public class LoginFrame extends JFrame {
     private JButton loginButton;
     private JButton registerButton;
 
-    // Spring Context 추가
     public LoginFrame(UserService userService, RoomService roomService, ConfigurableApplicationContext context) {
         this.userService = userService;
         this.roomService = roomService;
@@ -41,55 +40,50 @@ public class LoginFrame extends JFrame {
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // 서버 IP 라벨
+        // 서버 IP
         gbc.gridx = 0;
         gbc.gridy = 0;
         mainPanel.add(new JLabel("서버 IP:"), gbc);
 
-        // 서버 IP 입력
         serverIpField = new JTextField("localhost", 20);
         gbc.gridx = 1;
         gbc.gridy = 0;
         mainPanel.add(serverIpField, gbc);
 
-        // 사용자명 라벨
+        // 사용자명
         gbc.gridx = 0;
         gbc.gridy = 1;
         mainPanel.add(new JLabel("사용자명:"), gbc);
 
-        // 사용자명 입력
         usernameField = new JTextField(20);
         gbc.gridx = 1;
         gbc.gridy = 1;
         mainPanel.add(usernameField, gbc);
 
-        // 비밀번호 라벨
+        // 비밀번호
         gbc.gridx = 0;
         gbc.gridy = 2;
         mainPanel.add(new JLabel("비밀번호:"), gbc);
 
-        // 비밀번호 입력
         passwordField = new JPasswordField(20);
         gbc.gridx = 1;
         gbc.gridy = 2;
         mainPanel.add(passwordField, gbc);
 
-        // 닉네임 라벨
+        // 닉네임
         gbc.gridx = 0;
         gbc.gridy = 3;
         mainPanel.add(new JLabel("닉네임:"), gbc);
 
-        // 닉네임 입력
         nicknameField = new JTextField(20);
         gbc.gridx = 1;
         gbc.gridy = 3;
         mainPanel.add(nicknameField, gbc);
 
-        // 버튼 패널
+        // 버튼
         JPanel buttonPanel = new JPanel();
         loginButton = new JButton("로그인");
         registerButton = new JButton("회원가입");
-
         buttonPanel.add(loginButton);
         buttonPanel.add(registerButton);
 
@@ -100,14 +94,11 @@ public class LoginFrame extends JFrame {
 
         add(mainPanel);
 
-        // 이벤트 리스너
+        // 이벤트
         loginButton.addActionListener(e -> handleLogin());
         registerButton.addActionListener(e -> handleRegister());
-
-        // Enter 키로 로그인
         passwordField.addActionListener(e -> handleLogin());
 
-        // macOS 닫기 버튼 지원
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
@@ -116,7 +107,6 @@ public class LoginFrame extends JFrame {
         });
     }
 
-    // 로그인 처리
     private void handleLogin() {
         String serverIp = serverIpField.getText().trim();
         String username = usernameField.getText().trim();
@@ -137,10 +127,7 @@ public class LoginFrame extends JFrame {
         try {
             User user = userService.login(username, password);
 
-            // 소켓 클라이언트 연결
             SocketClient socketClient = new SocketClient(serverIp);
-
-            // AUTH 메시지로 연결 (LOGIN이 아닌 AUTH 사용)
             if (socketClient.authenticate(user.getUserId(), user.getNickname())) {
                 openMainFrame(user, socketClient);
             } else {
@@ -148,14 +135,12 @@ public class LoginFrame extends JFrame {
                         "서버 연결에 실패했습니다.\n서버 IP를 확인하세요: " + serverIp,
                         "연결 실패", JOptionPane.ERROR_MESSAGE);
             }
-
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(),
                     "로그인 실패", JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    // 회원가입 처리
     private void handleRegister() {
         String username = usernameField.getText().trim();
         String password = new String(passwordField.getPassword()).trim();
@@ -171,22 +156,17 @@ public class LoginFrame extends JFrame {
             userService.register(username, password, nickname);
             JOptionPane.showMessageDialog(this, "회원가입이 완료되었습니다. 로그인하세요.",
                     "회원가입 성공", JOptionPane.INFORMATION_MESSAGE);
-
-            // 필드 초기화
             nicknameField.setText("");
             passwordField.setText("");
             usernameField.requestFocus();
-
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(),
                     "회원가입 실패", JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    // 메인 화면 열기
     private void openMainFrame(User user, SocketClient socketClient) {
         this.dispose();
-
         SwingUtilities.invokeLater(() -> {
             UserService userServiceBean = context.getBean(UserService.class);
             MainFrame mainFrame = new MainFrame(roomService, userServiceBean, context);
